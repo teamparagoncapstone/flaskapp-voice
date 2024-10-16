@@ -27,7 +27,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("DATABASE_URL")
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 migrate.init_app(app, db) 
-CORS(app, origins=["http://localhost:3000"])  # Move CORS configuration here
+CORS(app, origins=["https://capstone-lms-red.vercel.app/"])  # Move CORS configuration here
 
 @app.route('/api/voice-exercises', methods=['GET'])
 def get_voice_exercises():

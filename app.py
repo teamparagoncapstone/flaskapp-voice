@@ -28,9 +28,11 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 migrate.init_app(app, db) 
 
-CORS(app, resources={r"/*": {"origins": "https://capstone-lms-red.vercel.app"}})
+CORS(app, resources={r"/*": {"origins": ["https://capstone-lms-red.vercel.app", "http://localhost:3000"]}})
 
-# Define the voice-exercises API route
+
+logging.basicConfig(level=logging.INFO)
+
 @app.route('/api/voice-exercises', methods=['GET'])
 def get_voice_exercises():
     try:
@@ -57,7 +59,14 @@ def get_voice_exercises():
     except Exception as e:
         app.logger.error(f"Error fetching voice exercises: {e}")
         return jsonify({'error': 'An error occurred while fetching data.'}), 500
-    
+
+@app.after_request
+def after_request(response):
+    # Allow CORS for all origins (or specify your domain)
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
+    return response
 sentence_transformer_model = SentenceTransformer('all-MiniLM-L6-v2')
 
 # Initialize BERT and RoBERTa models and tokenizers

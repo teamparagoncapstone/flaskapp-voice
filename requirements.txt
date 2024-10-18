@@ -1,0 +1,16 @@
+Flask
+Flask-SQLAlchemy
+python-dotenv
+psycopg2-binary
+Flask
+Flask-CORS
+python-dotenv
+SpeechRecognition
+pydub
+transformers
+torch
+jiwer
+sentence-transformers
+nltk
+flask-migrate
+numpy

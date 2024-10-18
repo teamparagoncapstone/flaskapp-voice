@@ -26,17 +26,24 @@ app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("DATABASE_URL")
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
-migrate.init_app(app, db) 
+migrate.init_app(app, db)
 
 CORS(app, resources={r"/*": {"origins": ["https://capstone-lms-red.vercel.app", "http://localhost:3000"]}})
 
-
 logging.basicConfig(level=logging.INFO)
 
+# Endpoint to fetch voice exercises
 @app.route('/api/voice-exercises', methods=['GET'])
 def get_voice_exercises():
     try:
         module_title = request.args.get('moduleTitle')
+        student_id = request.args.get('studentId')
+
+        # Check for student_id existence
+        if not student_id:
+            return jsonify({'error': 'studentId is required'}), 400
+        
+        # Fetch exercises based on module title
         if module_title:
             exercises = VoiceExcercises.query.join(Module).filter(Module.moduleTitle == module_title).all()
         else:
@@ -60,13 +67,14 @@ def get_voice_exercises():
         app.logger.error(f"Error fetching voice exercises: {e}")
         return jsonify({'error': 'An error occurred while fetching data.'}), 500
 
+# After request to handle CORS headers
 @app.after_request
 def after_request(response):
-    # Allow CORS for all origins (or specify your domain)
     response.headers.add('Access-Control-Allow-Origin', '*')
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
     response.headers.add('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
     return response
+
 sentence_transformer_model = SentenceTransformer('all-MiniLM-L6-v2')
 
 # Initialize BERT and RoBERTa models and tokenizers

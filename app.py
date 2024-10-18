@@ -284,7 +284,7 @@ def create_voice_exercise_history():
 
             # Save the data to the database
             new_history = VoiceExcercisesHistory(
-                voice=recognized_text,
+                voice=expected_text,
                 voiceRecord=audio_base64,
                 voiceImage=voice_image,
                 recognizedText=recognized_text,

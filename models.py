@@ -3,7 +3,6 @@ from datetime import datetime
 import uuid
 db = SQLAlchemy()
 
-
 class User(db.Model):
     __tablename__ = 'User'
     id = db.Column(db.String, primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -15,9 +14,6 @@ class User(db.Model):
     # Relationships
     students = db.relationship('Student', backref='user', lazy=True)
     
-    
-   
-
 class Student(db.Model):
     __tablename__ = 'Student'
     id = db.Column(db.String, primary_key=True, default=lambda: str(uuid.uuid4()))

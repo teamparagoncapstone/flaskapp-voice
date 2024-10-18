@@ -29,18 +29,15 @@ db.init_app(app)
 migrate.init_app(app, db) 
 
 CORS(app, resources={r"/*": {"origins": "https://capstone-lms-red.vercel.app"}})
-@app.route('/api/voice-exercises', methods=['GET'])
 
+# Define the voice-exercises API route
+@app.route('/api/voice-exercises', methods=['GET'])
 def get_voice_exercises():
     try:
-        # Get the module title from query parameters
         module_title = request.args.get('moduleTitle')
-
         if module_title:
-            # Filter by module title if provided
             exercises = VoiceExcercises.query.join(Module).filter(Module.moduleTitle == module_title).all()
         else:
-            # Query all records if no module title is provided
             exercises = VoiceExcercises.query.all()
 
         results = [
@@ -58,9 +55,9 @@ def get_voice_exercises():
         return jsonify(results), 200
 
     except Exception as e:
-        print(f"Error fetching voice exercises: {e}")
+        app.logger.error(f"Error fetching voice exercises: {e}")
         return jsonify({'error': 'An error occurred while fetching data.'}), 500
-
+    
 sentence_transformer_model = SentenceTransformer('all-MiniLM-L6-v2')
 
 # Initialize BERT and RoBERTa models and tokenizers

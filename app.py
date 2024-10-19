@@ -26,27 +26,30 @@ app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("DATABASE_URL")
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
-migrate.init_app(app, db)
-
+migrate.init_app(app, db) 
 CORS(app, resources={r"/*": {"origins": ["https://capstone-lms-red.vercel.app", "http://localhost:3000"]}}, supports_credentials=True)
 
 logging.basicConfig(level=logging.INFO)
 
-# Endpoint to fetch voice exercises
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', 'https://capstone-lms-red.vercel.app')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
+    response.headers.add('Access-Control-Allow-Credentials', 'true')
+    return response
+
 @app.route('/api/voice-exercises', methods=['GET'])
 def get_voice_exercises():
     try:
+        # Get the module title from query parameters
         module_title = request.args.get('moduleTitle')
-        student_id = request.args.get('studentId')
 
-        # Check for student_id existence
-        if not student_id:
-            return jsonify({'error': 'studentId is required'}), 400
-        
-        # Fetch exercises based on module title
         if module_title:
+            # Filter by module title if provided
             exercises = VoiceExcercises.query.join(Module).filter(Module.moduleTitle == module_title).all()
         else:
+            # Query all records if no module title is provided
             exercises = VoiceExcercises.query.all()
 
         results = [
@@ -64,17 +67,8 @@ def get_voice_exercises():
         return jsonify(results), 200
 
     except Exception as e:
-        app.logger.error(f"Error fetching voice exercises: {e}")
+        print(f"Error fetching voice exercises: {e}")
         return jsonify({'error': 'An error occurred while fetching data.'}), 500
-
-# After request to handle CORS headers
-@app.after_request
-def after_request(response):
-    response.headers.add('Access-Control-Allow-Origin', 'https://capstone-lms-red.vercel.app')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-    response.headers.add('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
-    response.headers.add('Access-Control-Allow-Credentials', 'true')
-    return response
 
 sentence_transformer_model = SentenceTransformer('all-MiniLM-L6-v2')
 
@@ -287,42 +281,9 @@ def create_voice_exercise_history():
             final_score = round(final_score, 2)
             grade = get_grade(final_score)
 
-            phonemes = json.dumps(get_phonemes(recognized_text)) 
-            voice_image = request.form.get('voice_image')
-            voice_exercises_id = request.form.get('voice_exercises_id')
-            student_id = request.form.get('student_id')
+            phonemes = get_phonemes(recognized_text)
 
-            if not student_id or not voice_exercises_id:
-                return jsonify({'error': 'student_id and voice_exercises_id are required'}), 400
-            
-            with open(wav_path, "rb") as audio_file:
-                audio_base64 = base64.b64encode(audio_file.read()).decode('utf-8')
-
-            # Save the data to the database
-            new_history = VoiceExcercisesHistory(
-                voice=expected_text,
-                voiceRecord=audio_base64,
-                voiceImage=voice_image,
-                recognizedText=recognized_text,
-                accuracyScore=str(accuracy_score),
-                pronunciationScore=str(pronunciation_score),
-                fluencyScore=str(fluency_score),
-                speedScore=str(speed_score),
-                phonemes=phonemes,  
-                voiceExercisesId=voice_exercises_id, 
-                studentId=student_id,
-                score=final_score   
-            )
-            print(f"Inserting: {new_history}")
-
-            db.session.add(new_history)
-            try:
-                db.session.commit()
-            except Exception as e:
-                db.session.rollback() 
-                app.logger.error(f"Database insertion error: {e}")
-                return jsonify({'error': 'Failed to save to database'}), 500
-
+            # Return the processed scores and details
             return jsonify({
                 'accuracy_score': accuracy_score,
                 'pronunciation_score': pronunciation_score,
@@ -332,14 +293,65 @@ def create_voice_exercise_history():
                 'grade': grade,
                 'recognized_text': recognized_text,
                 'phonemes': phonemes
-                
             }), 200  
         else:
             return jsonify({'error': 'No audio file or expected text received'}), 400
     except Exception as e:
-        app.logger.error(f"Error creating voice exercise history: {e}")
-        return jsonify({'error': 'An error occurred while creating history.'}), 500
+        app.logger.error(f"Error processing audio: {e}")
+        return jsonify({'error': 'An error occurred while processing audio.'}), 500
 
+@app.route('/api/submit-exercise', methods=['POST'])
+def submit_exercise():
+    data = request.get_json()
+    student_id = data.get('student_id')
+    voice_exercises_id = data.get('voice_exercises_id')
+
+    # Ensure that both student_id and voice_exercises_id are provided
+    if not student_id or not voice_exercises_id:
+        return jsonify({'error': 'Missing student ID or exercise ID'}), 400
+
+    # Get the necessary data from request
+    expected_text = data.get('expected_text')
+    voice_image = data.get('voice_image')
+    recognized_text = data.get('recognized_text')
+    accuracy_score = data.get('accuracy_score')
+    pronunciation_score = data.get('pronunciation_score')
+    fluency_score = data.get('fluency_score')
+    speed_score = data.get('speed_score')
+    phonemes = data.get('phonemes')
+    final_score = data.get('final_score')
+
+    # Create the record to insert into the database
+    new_history = VoiceExcercisesHistory(
+        voice=expected_text,
+        voiceRecord=data.get('voiceRecord'),
+        voiceImage=voice_image,
+        recognizedText=recognized_text,
+        accuracyScore=accuracy_score,
+        pronunciationScore=pronunciation_score,
+        fluencyScore=fluency_score,
+        speedScore=speed_score,
+        phonemes=json.dumps(phonemes),  
+        voiceExercisesId=voice_exercises_id, 
+        studentId=student_id,
+        score=final_score,
+        completed=True  # Mark as completed
+    )
+
+    # Update the voice exercise to completed status
+    exercise = VoiceExcercises.query.filter_by(id=voice_exercises_id).first()
+    if exercise:
+        exercise.completed = True
+
+    # Commit the new record to the database
+    db.session.add(new_history)
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': 'Failed to save to database'}), 500
+
+    return jsonify({'success': True}), 200
 
 
 if __name__ == '__main__':

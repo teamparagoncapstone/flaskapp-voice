@@ -27,7 +27,16 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("DATABASE_URL")
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 migrate.init_app(app, db) 
-CORS(app, origins=["https://capstone-lms-red.vercel.app"])  # Move CORS configuration here
+
+CORS(app, origins=["https://capstone-lms-red.vercel.app", "http://localhost:3000"], supports_credentials=True)
+
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', 'https://capstone-lms-red.vercel.app')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
+    response.headers.add('Access-Control-Allow-Credentials', 'true')
+    return response
 
 @app.route('/api/voice-exercises', methods=['GET'])
 def get_voice_exercises():
